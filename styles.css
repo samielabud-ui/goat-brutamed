@@ -645,6 +645,10 @@ h3 {
   font-weight: 800;
 }
 
+.auth-form label[hidden] {
+  display: none;
+}
+
 .auth-form input {
   width: 100%;
   min-height: 48px;
