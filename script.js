@@ -87,11 +87,37 @@ function getAuthErrorMessage(error) {
 }
 
 function getProfileErrorMessage(error) {
-  if (error?.code === "permission-denied") {
-    return "Login feito, mas o Firestore bloqueou o perfil. Ajuste as regras para users/{uid}.";
-  }
+  const details = error?.code ? ` (${error.code})` : "";
+  return `Login realizado, mas houve erro ao acessar o perfil. Verifique as regras do Firestore.${details}`;
+}
 
-  return "Login feito, mas nao foi possivel salvar/ler seu perfil. Tente novamente em instantes.";
+function logFirestoreError(operation, uid, error) {
+  console.error("Erro Firestore no perfil do usuario", {
+    operacao: operation,
+    uid,
+    caminho: uid ? `users/${uid}` : "users/{uid}",
+    codigo: error?.code || null,
+    mensagem: error?.message || null,
+    erroCompleto: error,
+  });
+}
+
+async function getUserProfileDoc(userRef, uid, operation = "getDoc") {
+  try {
+    return await getDoc(userRef);
+  } catch (error) {
+    logFirestoreError(operation, uid, error);
+    throw error;
+  }
+}
+
+async function setUserProfileDoc(userRef, uid, profile) {
+  try {
+    await setDoc(userRef, profile);
+  } catch (error) {
+    logFirestoreError("setDoc", uid, error);
+    throw error;
+  }
 }
 
 function setAuthMode(nextMode) {
@@ -108,7 +134,7 @@ function setAuthMode(nextMode) {
 }
 
 async function createUserProfile(userRef, user, fallbackName = "") {
-  await setDoc(userRef, {
+  await setUserProfileDoc(userRef, user.uid, {
     uid: user.uid,
     nome: user.displayName || fallbackName || user.email?.split("@")[0] || "Usuario",
     email: user.email || "",
@@ -121,12 +147,6 @@ async function createUserProfile(userRef, user, fallbackName = "") {
   });
 }
 
-async function readUserProfile(uid) {
-  const userRef = doc(db, "users", uid);
-  const snap = await getDoc(userRef);
-  return snap.exists() ? snap.data() : null;
-}
-
 async function ensureUserProfile(user, fallbackName = "") {
   const currentUid = auth.currentUser?.uid;
 
@@ -134,16 +154,18 @@ async function ensureUserProfile(user, fallbackName = "") {
     throw new Error("Usuario autenticado indisponivel ou divergente.");
   }
 
-  const userRef = doc(db, "users", currentUid);
-  const snap = await getDoc(userRef);
+  const userRef = doc(db, "users", user.uid);
+  const snap = await getUserProfileDoc(userRef, user.uid, "getDoc:ensureUserProfile");
 
   if (!snap.exists()) {
     await createUserProfile(userRef, user, fallbackName);
   }
 
-  const updatedSnap = await getDoc(userRef);
+  const updatedSnap = await getUserProfileDoc(userRef, user.uid, "getDoc:afterSetDoc");
   if (!updatedSnap.exists()) {
-    throw new Error(`Perfil users/${currentUid} nao foi encontrado apos criacao/leitura.`);
+    const error = new Error(`Perfil users/${user.uid} nao foi encontrado apos criacao/leitura.`);
+    logFirestoreError("getDoc:not-found-after-setDoc", user.uid, error);
+    throw error;
   }
 
   return updatedSnap.data();
@@ -155,11 +177,8 @@ async function loadAuthenticatedInterface(user, fallbackName = "") {
     applyAuthUI(user, profile);
     return profile;
   } catch (error) {
-    console.error("Erro ao criar/ler perfil do Firestore em users/{uid}", {
-      uid: auth.currentUser?.uid,
-      error,
-    });
-    applyAuthUI(user, { adm: false });
+    logFirestoreError("loadAuthenticatedInterface", auth.currentUser?.uid || user?.uid, error);
+    applyAuthUI(null, null);
     setAuthStatus(getProfileErrorMessage(error), "error");
     return null;
   }
@@ -289,7 +308,7 @@ onAuthStateChanged(auth, async (user) => {
     await loadAuthenticatedInterface(user);
   } catch (error) {
     console.error("Erro inesperado no estado de autenticacao", error);
-    applyAuthUI(user, { adm: false });
+    applyAuthUI(null, null);
     setAuthStatus(getProfileErrorMessage(error), "error");
   }
 });
