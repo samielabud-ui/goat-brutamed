@@ -8,13 +8,12 @@ import {
   updateProfile,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
-  get,
-  getDatabase,
-  ref,
+  doc,
+  getDoc,
+  getFirestore,
   serverTimestamp,
-  set,
-  update,
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDKE-sdCEw60UlPQqLvMjrHGl6KSG6nUCg",
@@ -28,7 +27,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const database = getDatabase(app);
+const db = getFirestore(app);
 
 const menuToggle = document.querySelector(".menu-toggle");
 const navLinks = document.querySelector("[data-nav-links]");
@@ -87,12 +86,12 @@ function getAuthErrorMessage(error) {
   return messages[error?.code] || "Nao foi possivel autenticar. Confira e-mail, senha e configuracao do Firebase.";
 }
 
-function getDatabaseErrorMessage(error) {
-  if (error?.code === "PERMISSION_DENIED") {
-    return "Login feito, mas o Realtime Database bloqueou o perfil. Ajuste as regras do banco para users/{uid}.";
+function getProfileErrorMessage(error) {
+  if (error?.code === "permission-denied") {
+    return "Login feito, mas o Firestore bloqueou o perfil. Ajuste as regras para users/{uid}.";
   }
 
-  return "Login feito, mas nao foi possivel salvar/ler o perfil no banco.";
+  return "Login feito, mas nao foi possivel salvar/ler seu perfil. Tente novamente em instantes.";
 }
 
 function setAuthMode(nextMode) {
@@ -108,38 +107,62 @@ function setAuthMode(nextMode) {
   setAuthStatus("");
 }
 
-async function ensureUserProfile(user, extraData = {}) {
-  const userRef = ref(database, `users/${user.uid}`);
-  const snapshot = await get(userRef);
+async function createUserProfile(userRef, user, fallbackName = "") {
+  await setDoc(userRef, {
+    uid: user.uid,
+    nome: user.displayName || fallbackName || user.email?.split("@")[0] || "Usuario",
+    email: user.email || "",
+    role: "membro",
+    adm: false,
+    diretor: false,
+    ativo: true,
+    criadoEm: serverTimestamp(),
+    atualizadoEm: serverTimestamp(),
+  });
+}
 
-  if (!snapshot.exists()) {
-    const profile = {
-      uid: user.uid,
-      name: user.displayName || extraData.name || "",
-      email: user.email || "",
-      role: "membro",
-      adm: false,
-      createdAt: serverTimestamp(),
-      lastLoginAt: serverTimestamp(),
-    };
+async function readUserProfile(uid) {
+  const userRef = doc(db, "users", uid);
+  const snap = await getDoc(userRef);
+  return snap.exists() ? snap.data() : null;
+}
 
-    await set(userRef, profile);
+async function ensureUserProfile(user, fallbackName = "") {
+  const currentUid = auth.currentUser?.uid;
+
+  if (!currentUid || currentUid !== user.uid) {
+    throw new Error("Usuario autenticado indisponivel ou divergente.");
+  }
+
+  const userRef = doc(db, "users", currentUid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    await createUserProfile(userRef, user, fallbackName);
+  }
+
+  const updatedSnap = await getDoc(userRef);
+  if (!updatedSnap.exists()) {
+    throw new Error(`Perfil users/${currentUid} nao foi encontrado apos criacao/leitura.`);
+  }
+
+  return updatedSnap.data();
+}
+
+async function loadAuthenticatedInterface(user, fallbackName = "") {
+  try {
+    const profile = await ensureUserProfile(user, fallbackName);
+    applyAuthUI(user, profile);
     return profile;
+  } catch (error) {
+    console.error("Erro ao criar/ler perfil do Firestore em users/{uid}", {
+      uid: auth.currentUser?.uid,
+      error,
+    });
+    applyAuthUI(user, { adm: false });
+    setAuthStatus(getProfileErrorMessage(error), "error");
+    return null;
   }
-
-  const profile = snapshot.val();
-  const profileUpdate = {
-    lastLoginAt: serverTimestamp(),
-    email: user.email || profile.email || "",
-  };
-
-  if (typeof profile.adm !== "boolean") {
-    profileUpdate.adm = false;
-  }
-
-  await update(userRef, profileUpdate);
-
-  return { ...profile, ...profileUpdate, adm: profile.adm === true };
 }
 
 function applyAuthUI(user, profile) {
@@ -156,9 +179,9 @@ function applyAuthUI(user, profile) {
   adminLink.hidden = !isAdm;
 
   if (isLoggedIn) {
-    authUserName.textContent = user.displayName || profile?.name || user.email;
+    authUserName.textContent = profile?.nome || user.displayName || user.email;
     authUserRole.textContent = `${role} | users/${user.uid} | adm: ${isAdm}`;
-    userDbPath.textContent = `Realtime Database: users/${user.uid}/adm = ${isAdm}`;
+    userDbPath.textContent = `Firestore: users/${user.uid}/adm = ${isAdm}`;
   } else {
     authUserName.textContent = "";
     authUserRole.textContent = "";
@@ -211,26 +234,16 @@ authForm.addEventListener("submit", async (event) => {
         await updateProfile(credential.user, { displayName: name });
       }
       authForm.reset();
-
-      try {
-        const profile = await ensureUserProfile(credential.user, { name });
-        applyAuthUI(credential.user, profile);
+      const profile = await loadAuthenticatedInterface(credential.user, name);
+      if (profile) {
         setAuthStatus("Conta criada. Perfil salvo com adm: false.", "success");
-      } catch (databaseError) {
-        applyAuthUI(credential.user, { name, email, adm: false });
-        setAuthStatus(getDatabaseErrorMessage(databaseError), "error");
       }
     } else {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       authForm.reset();
-
-      try {
-        const profile = await ensureUserProfile(credential.user);
-        applyAuthUI(credential.user, profile);
+      const profile = await loadAuthenticatedInterface(credential.user);
+      if (profile) {
         setAuthStatus("Login realizado.", "success");
-      } catch (databaseError) {
-        applyAuthUI(credential.user, { adm: false });
-        setAuthStatus(getDatabaseErrorMessage(databaseError), "error");
       }
     }
   } catch (error) {
@@ -273,11 +286,11 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   try {
-    const profile = await ensureUserProfile(user);
-    applyAuthUI(user, profile);
+    await loadAuthenticatedInterface(user);
   } catch (error) {
+    console.error("Erro inesperado no estado de autenticacao", error);
     applyAuthUI(user, { adm: false });
-    setAuthStatus("Login ativo, mas nao foi possivel ler o perfil no banco.", "error");
+    setAuthStatus(getProfileErrorMessage(error), "error");
   }
 });
 

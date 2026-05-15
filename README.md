@@ -6,7 +6,7 @@ Primeira versão visual da plataforma institucional e operacional da Atlética B
 
 - `index.html`: página pública com todas as seções navegáveis.
 - `styles.css`: identidade visual, responsividade e animações.
-- `script.js`: menu mobile, login Firebase Auth, perfil no Realtime Database e liberacao visual da aba ADM.
+- `script.js`: menu mobile, login Firebase Auth, perfil no Firestore e liberacao visual da aba ADM.
 
 ## Deploy no Netlify
 
@@ -14,7 +14,7 @@ Use a pasta `goat-brutamed` como raiz do deploy. Não há comando de build nesta
 
 ## Firebase
 
-O site usa Firebase Auth por e-mail/senha e Realtime Database.
+O site usa Firebase Auth por e-mail/senha e Firestore.
 
 No Firebase Console, ative:
 
@@ -32,10 +32,14 @@ Campos principais:
 ```json
 {
   "uid": "id-do-usuario",
-  "name": "Nome",
+  "nome": "Nome",
   "email": "email@exemplo.com",
   "role": "membro",
-  "adm": false
+  "adm": false,
+  "diretor": false,
+  "ativo": true,
+  "criadoEm": "serverTimestamp()",
+  "atualizadoEm": "serverTimestamp()"
 }
 ```
 
@@ -43,32 +47,30 @@ Para virar ADM:
 
 1. Entre/cadastre-se no site.
 2. Abra o Firebase Console do projeto `brutafrequencia`.
-3. Va em Realtime Database.
+3. Va em Firestore Database.
 4. Acesse `users/{seuUid}`.
 5. Altere `adm` de `false` para `true`.
 6. Recarregue o site ou entre novamente.
 
 Nao deixei o front-end mudar `adm` para `true` sozinho, porque isso permitiria que qualquer pessoa virasse administradora.
 
-Regras minimas sugeridas para o Realtime Database nesta fase:
+Regras minimas sugeridas para o Firestore nesta fase:
 
-```json
-{
-  "rules": {
-    "users": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid && newData.child('uid').val() === auth.uid && (newData.child('adm').val() === false || newData.child('adm').val() === data.child('adm').val())"
-      }
+```js
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, create, update: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
 ```
 
-Essas regras deixam o usuario criar/atualizar o proprio perfil, mas nao deixam ele se promover para `adm: true` pelo site.
+Essas regras sao para desenvolvimento. Elas deixam o usuario criar/ler o proprio perfil em `users/{uid}`.
 
 ## Próximas etapas previstas
 
-- Regras de seguranca completas do Realtime Database.
+- Regras de seguranca completas do Firestore.
 - Permissoes avancadas para membro, diretor e administrador.
 - Painel ADM funcional para controlar usuarios, loja, eventos, modalidades e configuracoes.
