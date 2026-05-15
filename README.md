@@ -30,7 +30,7 @@ Campos principais:
   "name": "Nome",
   "email": "email@exemplo.com",
   "role": "membro",
-  "isAdmin": false
+  "adm": false
 }
 ```
 
@@ -40,10 +40,10 @@ Para virar ADM:
 2. Abra o Firebase Console do projeto `brutafrequencia`.
 3. Va em Realtime Database.
 4. Acesse `users/{seuUid}`.
-5. Altere `isAdmin` de `false` para `true`.
+5. Altere `adm` de `false` para `true`.
 6. Recarregue o site ou entre novamente.
 
-Nao deixei o front-end mudar `isAdmin` para `true` sozinho, porque isso permitiria que qualquer pessoa virasse administradora.
+Nao deixei o front-end mudar `adm` para `true` sozinho, porque isso permitiria que qualquer pessoa virasse administradora.
 
 ## Próximas etapas previstas
 

@@ -97,7 +97,7 @@ async function ensureUserProfile(user, extraData = {}) {
       name: user.displayName || extraData.name || "",
       email: user.email || "",
       role: "membro",
-      isAdmin: false,
+      adm: false,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
     };
@@ -106,31 +106,38 @@ async function ensureUserProfile(user, extraData = {}) {
     return profile;
   }
 
-  await update(userRef, {
+  const profile = snapshot.val();
+  const profileUpdate = {
     lastLoginAt: serverTimestamp(),
-    email: user.email || snapshot.val().email || "",
-  });
+    email: user.email || profile.email || "",
+  };
 
-  return snapshot.val();
+  if (typeof profile.adm !== "boolean") {
+    profileUpdate.adm = false;
+  }
+
+  await update(userRef, profileUpdate);
+
+  return { ...profile, ...profileUpdate, adm: profile.adm === true };
 }
 
 function applyAuthUI(user, profile) {
   const isLoggedIn = Boolean(user);
-  const isAdmin = Boolean(profile?.isAdmin);
-  const role = isAdmin ? "Administrador" : "Membro";
+  const isAdm = profile?.adm === true;
+  const role = isAdm ? "Administrador" : "Membro";
 
   authOpenButtons.forEach((button) => {
     button.textContent = isLoggedIn ? "Minha conta" : "Entrar";
   });
 
   authUser.hidden = !isLoggedIn;
-  adminArea.classList.toggle("is-hidden", !isAdmin);
-  adminLink.hidden = !isAdmin;
+  adminArea.classList.toggle("is-hidden", !isAdm);
+  adminLink.hidden = !isAdm;
 
   if (isLoggedIn) {
     authUserName.textContent = user.displayName || profile?.name || user.email;
-    authUserRole.textContent = `${role} | users/${user.uid} | isAdmin: ${isAdmin}`;
-    userDbPath.textContent = `Realtime Database: users/${user.uid}/isAdmin = ${isAdmin}`;
+    authUserRole.textContent = `${role} | users/${user.uid} | adm: ${isAdm}`;
+    userDbPath.textContent = `Realtime Database: users/${user.uid}/adm = ${isAdm}`;
   } else {
     authUserName.textContent = "";
     authUserRole.textContent = "";
@@ -183,7 +190,7 @@ authForm.addEventListener("submit", async (event) => {
         await updateProfile(credential.user, { displayName: name });
       }
       await ensureUserProfile(credential.user, { name });
-      setAuthStatus("Conta criada. Perfil salvo com isAdmin: false.", "success");
+      setAuthStatus("Conta criada. Perfil salvo com adm: false.", "success");
     } else {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       await ensureUserProfile(credential.user);
@@ -237,7 +244,7 @@ onAuthStateChanged(auth, async (user) => {
     const profile = await ensureUserProfile(user);
     applyAuthUI(user, profile);
   } catch (error) {
-    applyAuthUI(user, { isAdmin: false });
+    applyAuthUI(user, { adm: false });
     setAuthStatus("Login ativo, mas nao foi possivel ler o perfil no banco.", "error");
   }
 });
