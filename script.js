@@ -25,7 +25,6 @@ const userDbPath = document.querySelector("[data-user-db-path]");
 let authMode = "login";
 let isSubmittingAuth = false;
 let hasHandledInitialAuthState = false;
-const LOGIN_TIMEOUT_MS = 10000;
 
 function setMenuState(isOpen) {
   menuToggle.setAttribute("aria-expanded", String(isOpen));
@@ -58,37 +57,10 @@ function setAuthLoading(isLoading, message = "") {
       : "Entrar";
 }
 
-function createTimeoutError(message) {
-  const error = new Error(message);
-  error.code = "timeout";
-  return error;
-}
-
-function withTimeout(promise, message, timeoutMs = LOGIN_TIMEOUT_MS) {
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = window.setTimeout(() => {
-      reject(createTimeoutError(message));
-    }, timeoutMs);
-  });
-
-  return Promise.race([promise, timeoutPromise]).finally(() => {
-    window.clearTimeout(timeoutId);
-  });
-}
-
-function getAuthErrorMessage(error) {
-  const messages = {
-    "auth/email-already-in-use": "Este e-mail ja tem uma conta.",
-    "auth/invalid-credential": "E-mail ou senha incorretos.",
-    "auth/invalid-email": "Digite um e-mail valido.",
-    "auth/missing-password": "Digite sua senha.",
-    "auth/operation-not-allowed": "Ative o provedor Email/Password no Firebase Authentication.",
-    "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
-    timeout: "Tempo esgotado ao entrar. Verifique sua conexao e as regras do Firestore.",
-  };
-
-  return messages[error?.code] || "Nao foi possivel autenticar. Confira e-mail, senha e configuracao do Firebase.";
+function formatFirebaseError(error) {
+  const code = error?.code || "sem-codigo";
+  const message = error?.message || "Erro desconhecido.";
+  return `Erro: ${code} - ${message}`;
 }
 
 function setAuthMode(nextMode) {
@@ -186,28 +158,19 @@ authForm.addEventListener("submit", async (event) => {
     setAuthStatus(authMode === "register" ? "Criando conta..." : "Entrando...");
 
     if (authMode === "register") {
-      const credential = await withTimeout(
-        createUserWithEmailAndPassword(auth, email, password),
-        "Tempo esgotado ao criar conta. Verifique sua conexao e as regras do Firestore."
-      );
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
       console.log("[LOGIN] Firebase Auth OK:", credential.user.uid);
       if (name) {
         await updateProfile(credential.user, { displayName: name });
       }
       authForm.reset();
-      const profile = await withTimeout(
-        ensureUserProfile(credential.user),
-        "Tempo esgotado ao carregar perfil. Verifique sua conexao e as regras do Firestore."
-      );
+      const profile = await ensureUserProfile(credential.user);
       if (profile) {
         applyAuthUI(credential.user, profile);
         setAuthStatus("Conta criada e perfil carregado.", "success");
       }
     } else {
-      const result = await withTimeout(
-        loginUser(email, password),
-        "Tempo esgotado ao entrar. Verifique sua conexao e as regras do Firestore."
-      );
+      const result = await loginUser(email, password);
       console.log("[LOGIN] Firebase Auth OK:", result.user.uid);
       authForm.reset();
       applyAuthUI(result.user, result.profile);
@@ -215,7 +178,7 @@ authForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     console.error("[LOGIN] Erro completo:", error);
-    setAuthStatus(error.message || getAuthErrorMessage(error), "error");
+    setAuthStatus(formatFirebaseError(error), "error");
   } finally {
     console.log("[LOGIN] Liberando loading");
     setAuthLoading(false);

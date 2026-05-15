@@ -35,6 +35,7 @@ export async function ensureUserProfile(user) {
 
     await setDoc(userRef, profile, { merge: true });
     console.log("[PROFILE] Perfil criado:", `users/${user.uid}`);
+    console.log("[PROFILE] Perfil carregado:", profile);
     return profile;
   }
 
@@ -47,7 +48,9 @@ export async function ensureUserProfile(user) {
 }
 
 export async function loginUser(email, password) {
+  console.log("[LOGIN] Chamando Firebase Authentication");
   const result = await signInWithEmailAndPassword(auth, email, password);
+  console.log("[LOGIN] Auth OK. UID:", result.user.uid);
   const profile = await ensureUserProfile(result.user);
 
   return {
