@@ -167,7 +167,7 @@ img {
   color: var(--white);
 }
 
-.nav-login {
+.nav-links .nav-login {
   min-height: 42px;
   padding: 0 15px;
   border: 1px solid rgba(67, 224, 160, 0.35);
@@ -184,6 +184,7 @@ img {
 .quick-access,
 .content-section,
 .ranking,
+.auth-page,
 .footer {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
@@ -339,7 +340,8 @@ h3 {
 
 .quick-access,
 .content-section,
-.ranking {
+.ranking,
+.auth-page {
   padding: 62px 0;
 }
 
@@ -544,51 +546,91 @@ h3 {
   line-height: 1.6;
 }
 
-.auth-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
+.auth-page {
   display: grid;
-  place-items: center;
+  gap: 24px;
+  min-height: calc(100vh - 76px);
+  align-items: center;
+}
+
+.auth-page-copy {
+  max-width: 680px;
+}
+
+.auth-page-copy p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.auth-proof {
+  display: grid;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 24px;
   padding: 18px;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(6, 27, 21, 0.78);
 }
 
-.auth-modal[hidden] {
-  display: none;
+.auth-proof span {
+  color: var(--mint);
+  font-weight: 950;
 }
 
-.auth-dialog {
-  position: relative;
-  width: min(460px, 100%);
-  max-height: calc(100vh - 36px);
-  overflow: auto;
-  padding: 26px;
+.auth-proof small {
+  max-width: 280px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.auth-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-card,
+.auth-session {
   border: 1px solid var(--line);
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(13, 47, 36, 0.98), rgba(3, 17, 13, 0.98));
+  background: linear-gradient(180deg, rgba(13, 47, 36, 0.96), rgba(3, 17, 13, 0.96));
   box-shadow: var(--shadow);
 }
 
-.auth-dialog h2 {
-  font-size: clamp(1.8rem, 7vw, 2.6rem);
+.auth-card {
+  padding: 24px;
 }
 
-.auth-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--white);
+.auth-card-header p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.auth-card-header h3 {
   font-size: 1.45rem;
-  cursor: pointer;
+}
+
+.auth-session {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 20px;
+}
+
+.auth-session > span {
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(67, 224, 160, 0.1);
+  color: var(--mint);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.auth-session > p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .auth-copy,
@@ -795,6 +837,15 @@ h3 {
   .roles-grid,
   .admin-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .auth-page {
+    grid-template-columns: 0.9fr 1.1fr;
+    gap: 48px;
+  }
+
+  .auth-shell {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .footer {

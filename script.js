@@ -32,9 +32,8 @@ const menuToggle = document.querySelector(".menu-toggle");
 const navLinks = document.querySelector("[data-nav-links]");
 const navAnchors = document.querySelectorAll(".nav-links a");
 const revealSections = document.querySelectorAll(".section-reveal");
-const authModal = document.querySelector("[data-auth-modal]");
+const authPage = document.querySelector("[data-auth-page]");
 const authOpenButtons = document.querySelectorAll("[data-auth-open]");
-const authClose = document.querySelector("[data-auth-close]");
 const authForm = document.querySelector("[data-auth-form]");
 const authTabs = document.querySelectorAll("[data-auth-mode]");
 const nameField = document.querySelector("[data-name-field]");
@@ -44,6 +43,7 @@ const authUser = document.querySelector("[data-auth-user]");
 const authUserName = document.querySelector("[data-auth-user-name]");
 const authUserRole = document.querySelector("[data-auth-user-role]");
 const authLogout = document.querySelector("[data-auth-logout]");
+const authEmpty = document.querySelector("[data-auth-empty]");
 const adminArea = document.querySelector("[data-admin-area]");
 const adminLink = document.querySelector("[data-admin-link]");
 const userDbPath = document.querySelector("[data-user-db-path]");
@@ -59,14 +59,13 @@ function setMenuState(isOpen) {
   document.body.classList.toggle("menu-open", isOpen);
 }
 
-function openAuthModal() {
-  authModal.hidden = false;
-  document.body.classList.add("menu-open");
+function openAuthPage() {
+  window.location.hash = "login";
+  authPage?.scrollIntoView({ behavior: "smooth", block: "start" });
+  authForm?.querySelector('input[name="email"]')?.focus({ preventScroll: true });
 }
 
-function closeAuthModal() {
-  authModal.hidden = true;
-  document.body.classList.remove("menu-open");
+function clearAuthStatus() {
   setAuthStatus("");
 }
 
@@ -217,6 +216,9 @@ function applyAuthUI(user, profile) {
   });
 
   authUser.hidden = !isLoggedIn;
+  if (authEmpty) {
+    authEmpty.hidden = isLoggedIn;
+  }
   adminArea.classList.toggle("is-hidden", !isAdm);
   adminLink.hidden = !isAdm;
 
@@ -241,18 +243,11 @@ navAnchors.forEach((anchor) => {
 });
 
 authOpenButtons.forEach((button) => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
     setMenuState(false);
-    openAuthModal();
+    openAuthPage();
   });
-});
-
-authClose.addEventListener("click", closeAuthModal);
-
-authModal.addEventListener("click", (event) => {
-  if (event.target === authModal) {
-    closeAuthModal();
-  }
 });
 
 authTabs.forEach((tab) => {
@@ -320,7 +315,7 @@ authLogout.addEventListener("click", async () => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setMenuState(false);
-    closeAuthModal();
+    clearAuthStatus();
   }
 });
 

@@ -44,7 +44,7 @@
           <a href="#diretoria">Diretoria</a>
           <a href="#admin-area" data-admin-link hidden>ADM</a>
           <a href="#contato">Contato</a>
-          <button class="nav-login" type="button" data-auth-open>Entrar</button>
+          <a class="nav-login" href="#login" data-auth-open>Entrar</a>
         </div>
       </nav>
     </header>
@@ -334,6 +334,65 @@
           </article>
         </div>
       </section>
+
+      <section class="auth-page section-reveal" id="login" aria-labelledby="auth-title" data-auth-page>
+        <div class="auth-page-copy">
+          <p class="eyebrow">Acesso GOAT</p>
+          <h2 id="auth-title">Entrar na plataforma</h2>
+          <p>
+            Acesse com sua conta Firebase Auth. O perfil operacional e as permissões são carregados
+            no Firestore pelo documento <strong>users/{uid}</strong>.
+          </p>
+          <div class="auth-proof">
+            <span>GOAT</span>
+            <strong>Portal BrutaMed</strong>
+            <small>Eventos, modalidades, ranking e gestão futura em um só lugar.</small>
+          </div>
+        </div>
+
+        <div class="auth-shell">
+          <div class="auth-card" data-auth-component>
+            <div class="auth-card-header">
+              <p class="eyebrow">Conta</p>
+              <h3>Acesso restrito</h3>
+              <p>Entre ou crie uma conta. Para liberar acesso, o perfil precisa existir em users/{uid}.</p>
+            </div>
+
+            <div class="auth-tabs" role="tablist" aria-label="Modo de autenticacao">
+              <button class="auth-tab is-active" type="button" data-auth-mode="login">Entrar</button>
+              <button class="auth-tab" type="button" data-auth-mode="register">Criar conta</button>
+            </div>
+
+            <form class="auth-form" data-auth-form>
+              <label data-name-field hidden>
+                Nome
+                <input type="text" name="name" autocomplete="name" placeholder="Seu nome" />
+              </label>
+              <label>
+                E-mail
+                <input type="email" name="email" autocomplete="email" placeholder="voce@email.com" required />
+              </label>
+              <label>
+                Senha
+                <input type="password" name="password" autocomplete="current-password" placeholder="Minimo 6 caracteres" required minlength="6" />
+              </label>
+              <button class="button primary auth-submit" type="submit" data-auth-submit>Entrar</button>
+            </form>
+
+            <p class="auth-status" data-auth-status></p>
+          </div>
+
+          <aside class="auth-session" aria-label="Sessão atual">
+            <span>Status</span>
+            <div class="auth-user" data-auth-user hidden>
+              <strong data-auth-user-name></strong>
+              <span data-auth-user-role></span>
+              <button class="button secondary" type="button" data-auth-logout>Sair</button>
+            </div>
+            <p data-auth-empty>Sem usuário carregado no momento.</p>
+          </aside>
+        </div>
+      </section>
     </main>
 
     <footer class="footer section-reveal" id="contato">
@@ -353,43 +412,6 @@
       </div>
       <p class="copyright">GOAT © 2026 BrutaMed. Plataforma institucional em desenvolvimento.</p>
     </footer>
-
-    <div class="auth-modal" data-auth-modal hidden>
-      <div class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <button class="auth-close" type="button" aria-label="Fechar login" data-auth-close>×</button>
-        <p class="eyebrow">Acesso GOAT</p>
-        <h2 id="auth-title">Entrar na plataforma</h2>
-        <p class="auth-copy">Use e-mail e senha para entrar. Novas contas recebem <strong>adm: false</strong> automaticamente.</p>
-
-        <div class="auth-tabs" role="tablist" aria-label="Modo de autenticacao">
-          <button class="auth-tab is-active" type="button" data-auth-mode="login">Entrar</button>
-          <button class="auth-tab" type="button" data-auth-mode="register">Criar conta</button>
-        </div>
-
-        <form class="auth-form" data-auth-form>
-          <label data-name-field hidden>
-            Nome
-            <input type="text" name="name" autocomplete="name" placeholder="Seu nome" />
-          </label>
-          <label>
-            E-mail
-            <input type="email" name="email" autocomplete="email" placeholder="voce@email.com" required />
-          </label>
-          <label>
-            Senha
-            <input type="password" name="password" autocomplete="current-password" placeholder="Minimo 6 caracteres" required minlength="6" />
-          </label>
-          <button class="button primary auth-submit" type="submit" data-auth-submit>Entrar</button>
-        </form>
-
-        <p class="auth-status" data-auth-status></p>
-        <div class="auth-user" data-auth-user hidden>
-          <strong data-auth-user-name></strong>
-          <span data-auth-user-role></span>
-          <button class="button secondary" type="button" data-auth-logout>Sair</button>
-        </div>
-      </div>
-    </div>
 
     <script type="module" src="script.js"></script>
   </body>
