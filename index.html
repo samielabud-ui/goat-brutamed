@@ -42,7 +42,9 @@
           <a href="#loja">Loja</a>
           <a href="#ranking">Ranking</a>
           <a href="#diretoria">Diretoria</a>
+          <a href="#admin-area" data-admin-link hidden>ADM</a>
           <a href="#contato">Contato</a>
+          <button class="nav-login" type="button" data-auth-open>Entrar</button>
         </div>
       </nav>
     </header>
@@ -304,6 +306,34 @@
           <span>login, permissões, banco de dados, painel administrativo e módulos editáveis.</span>
         </div>
       </section>
+      <section class="content-section admin-area section-reveal is-hidden" id="admin-area" aria-labelledby="admin-title" data-admin-area>
+        <div class="section-heading">
+          <p class="eyebrow">Painel ADM</p>
+          <h2 id="admin-title">Controle GOAT</h2>
+          <p>
+            Esta aba aparece automaticamente para contas com <strong>isAdmin: true</strong> no
+            Realtime Database.
+          </p>
+        </div>
+
+        <div class="admin-grid">
+          <article class="admin-card">
+            <span>Usuarios</span>
+            <h3>Permissoes</h3>
+            <p>Base preparada para gerenciar membros, diretores e administradores.</p>
+          </article>
+          <article class="admin-card">
+            <span>Conteudo</span>
+            <h3>Modulos do site</h3>
+            <p>Futuro controle de eventos, loja, modalidades e ranking.</p>
+          </article>
+          <article class="admin-card">
+            <span>Banco</span>
+            <h3>Seu caminho de perfil</h3>
+            <p data-user-db-path>Entre para ver o caminho do seu usuario no Firebase.</p>
+          </article>
+        </div>
+      </section>
     </main>
 
     <footer class="footer section-reveal" id="contato">
@@ -324,6 +354,43 @@
       <p class="copyright">GOAT © 2026 BrutaMed. Plataforma institucional em desenvolvimento.</p>
     </footer>
 
-    <script src="script.js"></script>
+    <div class="auth-modal" data-auth-modal hidden>
+      <div class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <button class="auth-close" type="button" aria-label="Fechar login" data-auth-close>×</button>
+        <p class="eyebrow">Acesso GOAT</p>
+        <h2 id="auth-title">Entrar na plataforma</h2>
+        <p class="auth-copy">Use e-mail e senha para entrar. Novas contas recebem <strong>isAdmin: false</strong> automaticamente.</p>
+
+        <div class="auth-tabs" role="tablist" aria-label="Modo de autenticacao">
+          <button class="auth-tab is-active" type="button" data-auth-mode="login">Entrar</button>
+          <button class="auth-tab" type="button" data-auth-mode="register">Criar conta</button>
+        </div>
+
+        <form class="auth-form" data-auth-form>
+          <label data-name-field hidden>
+            Nome
+            <input type="text" name="name" autocomplete="name" placeholder="Seu nome" />
+          </label>
+          <label>
+            E-mail
+            <input type="email" name="email" autocomplete="email" placeholder="voce@email.com" required />
+          </label>
+          <label>
+            Senha
+            <input type="password" name="password" autocomplete="current-password" placeholder="Minimo 6 caracteres" required minlength="6" />
+          </label>
+          <button class="button primary auth-submit" type="submit" data-auth-submit>Entrar</button>
+        </form>
+
+        <p class="auth-status" data-auth-status></p>
+        <div class="auth-user" data-auth-user hidden>
+          <strong data-auth-user-name></strong>
+          <span data-auth-user-role></span>
+          <button class="button secondary" type="button" data-auth-logout>Sair</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
   </body>
 </html>
