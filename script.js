@@ -50,6 +50,9 @@ const adminLink = document.querySelector("[data-admin-link]");
 const userDbPath = document.querySelector("[data-user-db-path]");
 
 let authMode = "login";
+let isSubmittingAuth = false;
+let hasHandledInitialAuthState = false;
+const LOGIN_TIMEOUT_MS = 10000;
 
 function setMenuState(isOpen) {
   menuToggle.setAttribute("aria-expanded", String(isOpen));
@@ -73,6 +76,35 @@ function setAuthStatus(message, type = "info") {
   authStatus.dataset.type = type;
 }
 
+function setAuthLoading(isLoading, message = "") {
+  isSubmittingAuth = isLoading;
+  authSubmit.disabled = isLoading;
+  authSubmit.textContent = isLoading
+    ? message || (authMode === "register" ? "Criando conta..." : "Entrando...")
+    : authMode === "register"
+      ? "Criar conta"
+      : "Entrar";
+}
+
+function createTimeoutError(message) {
+  const error = new Error(message);
+  error.code = "timeout";
+  return error;
+}
+
+function withTimeout(promise, message, timeoutMs = LOGIN_TIMEOUT_MS) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(createTimeoutError(message));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
+
 function getAuthErrorMessage(error) {
   const messages = {
     "auth/email-already-in-use": "Este e-mail ja tem uma conta.",
@@ -81,6 +113,7 @@ function getAuthErrorMessage(error) {
     "auth/missing-password": "Digite sua senha.",
     "auth/operation-not-allowed": "Ative o provedor Email/Password no Firebase Authentication.",
     "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
+    timeout: "Tempo esgotado ao entrar. Verifique sua conexao e as regras do Firestore.",
   };
 
   return messages[error?.code] || "Nao foi possivel autenticar. Confira e-mail, senha e configuracao do Firebase.";
@@ -104,6 +137,7 @@ function logFirestoreError(operation, uid, error) {
 
 async function getUserProfileDoc(userRef, uid, operation = "getDoc") {
   try {
+    console.log("[PROFILE] Lendo caminho:", `users/${uid}`);
     return await getDoc(userRef);
   } catch (error) {
     logFirestoreError(operation, uid, error);
@@ -113,7 +147,8 @@ async function getUserProfileDoc(userRef, uid, operation = "getDoc") {
 
 async function setUserProfileDoc(userRef, uid, profile) {
   try {
-    await setDoc(userRef, profile);
+    console.log("[PROFILE] Criando/atualizando caminho:", `users/${uid}`);
+    await setDoc(userRef, profile, { merge: true });
   } catch (error) {
     logFirestoreError("setDoc", uid, error);
     throw error;
@@ -121,10 +156,14 @@ async function setUserProfileDoc(userRef, uid, profile) {
 }
 
 function setAuthMode(nextMode) {
+  if (isSubmittingAuth) {
+    return;
+  }
+
   authMode = nextMode;
   const isRegister = authMode === "register";
   nameField.hidden = !isRegister;
-  authSubmit.textContent = isRegister ? "Criar conta" : "Entrar";
+  setAuthLoading(false);
 
   authTabs.forEach((tab) => {
     tab.classList.toggle("is-active", tab.dataset.authMode === authMode);
@@ -154,11 +193,14 @@ async function ensureUserProfile(user, fallbackName = "") {
     throw new Error("Usuario autenticado indisponivel ou divergente.");
   }
 
+  console.log("[LOGIN] uid recebido:", user.uid);
   const userRef = doc(db, "users", user.uid);
   const snap = await getUserProfileDoc(userRef, user.uid, "getDoc:ensureUserProfile");
 
   if (!snap.exists()) {
+    console.log("[PROFILE] Perfil inexistente, criando");
     await createUserProfile(userRef, user, fallbackName);
+    console.log("[PROFILE] Perfil criado");
   }
 
   const updatedSnap = await getUserProfileDoc(userRef, user.uid, "getDoc:afterSetDoc");
@@ -168,7 +210,12 @@ async function ensureUserProfile(user, fallbackName = "") {
     throw error;
   }
 
-  return updatedSnap.data();
+  const profile = {
+    id: updatedSnap.id,
+    ...updatedSnap.data(),
+  };
+  console.log("[PROFILE] Perfil carregado:", profile);
+  return profile;
 }
 
 async function loadAuthenticatedInterface(user, fallbackName = "") {
@@ -244,31 +291,48 @@ authForm.addEventListener("submit", async (event) => {
   const password = String(formData.get("password") || "");
 
   try {
-    authSubmit.disabled = true;
+    console.log("[LOGIN] Iniciando login");
+    setAuthLoading(true);
     setAuthStatus(authMode === "register" ? "Criando conta..." : "Entrando...");
 
     if (authMode === "register") {
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const credential = await withTimeout(
+        createUserWithEmailAndPassword(auth, email, password),
+        "Tempo esgotado ao criar conta. Verifique sua conexao e as regras do Firestore."
+      );
+      console.log("[LOGIN] Firebase Auth OK:", credential.user.uid);
       if (name) {
         await updateProfile(credential.user, { displayName: name });
       }
       authForm.reset();
-      const profile = await loadAuthenticatedInterface(credential.user, name);
+      const profile = await withTimeout(
+        loadAuthenticatedInterface(credential.user, name),
+        "Tempo esgotado ao carregar perfil. Verifique sua conexao e as regras do Firestore."
+      );
       if (profile) {
         setAuthStatus("Conta criada. Perfil salvo com adm: false.", "success");
       }
     } else {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const credential = await withTimeout(
+        signInWithEmailAndPassword(auth, email, password),
+        "Tempo esgotado ao entrar. Verifique sua conexao e as regras do Firestore."
+      );
+      console.log("[LOGIN] Firebase Auth OK:", credential.user.uid);
       authForm.reset();
-      const profile = await loadAuthenticatedInterface(credential.user);
+      const profile = await withTimeout(
+        loadAuthenticatedInterface(credential.user),
+        "Tempo esgotado ao carregar perfil. Verifique sua conexao e as regras do Firestore."
+      );
       if (profile) {
         setAuthStatus("Login realizado.", "success");
       }
     }
   } catch (error) {
+    console.error("[LOGIN] Erro completo:", error);
     setAuthStatus(getAuthErrorMessage(error), "error");
   } finally {
-    authSubmit.disabled = false;
+    console.log("[LOGIN] Liberando loading");
+    setAuthLoading(false);
   }
 });
 
@@ -299,8 +363,15 @@ const revealObserver = new IntersectionObserver(
 revealSections.forEach((section) => revealObserver.observe(section));
 
 onAuthStateChanged(auth, async (user) => {
+  const shouldLoadProfile = !hasHandledInitialAuthState && user;
+  hasHandledInitialAuthState = true;
+
   if (!user) {
     applyAuthUI(null, null);
+    return;
+  }
+
+  if (isSubmittingAuth || !shouldLoadProfile) {
     return;
   }
 
