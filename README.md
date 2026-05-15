@@ -6,7 +6,9 @@ Primeira versão visual da plataforma institucional e operacional da Atlética B
 
 - `index.html`: página pública com todas as seções navegáveis.
 - `styles.css`: identidade visual, responsividade e animações.
-- `script.js`: menu mobile, login Firebase Auth, perfil no Firestore e liberacao visual da aba ADM.
+- `script.js`: menu mobile, estados da interface e integração com os serviços de autenticação.
+- `src/firebase.js`: configuração Firebase, Auth e Firestore.
+- `src/authService.js`: login, logout e criação/leitura do perfil em `users/{uid}`.
 
 ## Deploy no Netlify
 
@@ -21,7 +23,7 @@ No Firebase Console, ative:
 - Authentication > Sign-in method > Email/Password.
 - Authentication > Settings > Authorized domains: inclua o dominio do Netlify quando publicar.
 
-Ao entrar com uma conta, o app busca o perfil manualmente criado em:
+Ao entrar com uma conta, o app busca ou cria automaticamente o perfil em:
 
 ```txt
 users/{uid}

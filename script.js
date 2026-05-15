@@ -1,32 +1,6 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import {
-  createUserWithEmailAndPassword,
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import {
-  doc,
-  getDoc,
-  getFirestore,
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDKE-sdCEw60UlPQqLvMjrHGl6KSG6nUCg",
-  authDomain: "brutafrequencia.firebaseapp.com",
-  databaseURL: "https://brutafrequencia-default-rtdb.firebaseio.com",
-  projectId: "brutafrequencia",
-  storageBucket: "brutafrequencia.firebasestorage.app",
-  messagingSenderId: "324840070453",
-  appId: "1:324840070453:web:861cd59d025ad35f9e007c",
-  measurementId: "G-35WXP8FRCP",
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+import { createUserWithEmailAndPassword, onAuthStateChanged, updateProfile } from "firebase/auth";
+import { auth } from "./src/firebase.js";
+import { ensureUserProfile, loginUser, logoutUser } from "./src/authService.js";
 
 const menuToggle = document.querySelector(".menu-toggle");
 const navLinks = document.querySelector("[data-nav-links]");
@@ -117,35 +91,6 @@ function getAuthErrorMessage(error) {
   return messages[error?.code] || "Nao foi possivel autenticar. Confira e-mail, senha e configuracao do Firebase.";
 }
 
-function getProfileErrorMessage(error) {
-  if (error?.message) {
-    return error.message;
-  }
-
-  return "Login realizado, mas houve erro ao acessar o perfil. Verifique as regras do Firestore.";
-}
-
-function logFirestoreError(operation, uid, error) {
-  console.error("Erro Firestore no perfil do usuario", {
-    operacao: operation,
-    uid,
-    caminho: uid ? `users/${uid}` : "users/{uid}",
-    codigo: error?.code || null,
-    mensagem: error?.message || null,
-    erroCompleto: error,
-  });
-}
-
-async function getUserProfileDoc(userRef, uid, operation = "getDoc") {
-  try {
-    console.log("[PROFILE] Lendo caminho:", `users/${uid}`);
-    return await getDoc(userRef);
-  } catch (error) {
-    logFirestoreError(operation, uid, error);
-    throw error;
-  }
-}
-
 function setAuthMode(nextMode) {
   if (isSubmittingAuth) {
     return;
@@ -163,45 +108,19 @@ function setAuthMode(nextMode) {
   setAuthStatus("");
 }
 
-async function loadUserProfile(user) {
-  const currentUid = auth.currentUser?.uid;
-
-  if (!currentUid || currentUid !== user.uid) {
-    throw new Error("Usuario autenticado indisponivel ou divergente.");
-  }
-
-  console.log("[PROFILE] UID Auth:", user.uid);
-  const userRef = doc(db, "users", user.uid);
-  console.log("[PROFILE] Buscando:", `users/${user.uid}`);
-
-  const snap = await getUserProfileDoc(userRef, user.uid, "getDoc:loadUserProfile");
-  if (!snap.exists()) {
-    console.log("[PROFILE] Resultado: nao encontrado");
-    const error = new Error(
-      `Usuario autenticado, mas perfil nao encontrado em users/${user.uid}. Crie esse documento no Firestore usando o UID como ID.`
-    );
-    logFirestoreError("getDoc:not-found", user.uid, error);
-    throw error;
-  }
-
-  const profile = {
-    id: snap.id,
-    ...snap.data(),
-  };
-  console.log("[PROFILE] Resultado: encontrado");
-  console.log("[PROFILE] Perfil carregado:", profile);
-  return profile;
-}
-
 async function loadAuthenticatedInterface(user) {
   try {
-    const profile = await loadUserProfile(user);
+    const profile = await ensureUserProfile(user);
     applyAuthUI(user, profile);
     return profile;
   } catch (error) {
-    logFirestoreError("loadAuthenticatedInterface", auth.currentUser?.uid || user?.uid, error);
+    console.error("[PROFILE] Erro ao carregar perfil", {
+      uid: auth.currentUser?.uid || user?.uid,
+      caminho: user?.uid ? `users/${user.uid}` : "users/{uid}",
+      error,
+    });
     applyAuthUI(null, null);
-    setAuthStatus(getProfileErrorMessage(error), "error");
+    setAuthStatus(error.message || "Login realizado, mas houve erro ao acessar o perfil.", "error");
     return null;
   }
 }
@@ -277,30 +196,26 @@ authForm.addEventListener("submit", async (event) => {
       }
       authForm.reset();
       const profile = await withTimeout(
-        loadAuthenticatedInterface(credential.user),
+        ensureUserProfile(credential.user),
         "Tempo esgotado ao carregar perfil. Verifique sua conexao e as regras do Firestore."
       );
       if (profile) {
+        applyAuthUI(credential.user, profile);
         setAuthStatus("Conta criada e perfil carregado.", "success");
       }
     } else {
-      const credential = await withTimeout(
-        signInWithEmailAndPassword(auth, email, password),
+      const result = await withTimeout(
+        loginUser(email, password),
         "Tempo esgotado ao entrar. Verifique sua conexao e as regras do Firestore."
       );
-      console.log("[LOGIN] Firebase Auth OK:", credential.user.uid);
+      console.log("[LOGIN] Firebase Auth OK:", result.user.uid);
       authForm.reset();
-      const profile = await withTimeout(
-        loadAuthenticatedInterface(credential.user),
-        "Tempo esgotado ao carregar perfil. Verifique sua conexao e as regras do Firestore."
-      );
-      if (profile) {
-        setAuthStatus("Login realizado.", "success");
-      }
+      applyAuthUI(result.user, result.profile);
+      setAuthStatus("Login realizado.", "success");
     }
   } catch (error) {
     console.error("[LOGIN] Erro completo:", error);
-    setAuthStatus(getAuthErrorMessage(error), "error");
+    setAuthStatus(error.message || getAuthErrorMessage(error), "error");
   } finally {
     console.log("[LOGIN] Liberando loading");
     setAuthLoading(false);
@@ -308,7 +223,7 @@ authForm.addEventListener("submit", async (event) => {
 });
 
 authLogout.addEventListener("click", async () => {
-  await signOut(auth);
+  await logoutUser();
   setAuthStatus("Voce saiu da conta.", "success");
 });
 
@@ -351,7 +266,7 @@ onAuthStateChanged(auth, async (user) => {
   } catch (error) {
     console.error("Erro inesperado no estado de autenticacao", error);
     applyAuthUI(null, null);
-    setAuthStatus(getProfileErrorMessage(error), "error");
+    setAuthStatus(error.message || "Login realizado, mas houve erro ao acessar o perfil.", "error");
   }
 });
 
