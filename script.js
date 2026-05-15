@@ -74,6 +74,27 @@ function setAuthStatus(message, type = "info") {
   authStatus.dataset.type = type;
 }
 
+function getAuthErrorMessage(error) {
+  const messages = {
+    "auth/email-already-in-use": "Este e-mail ja tem uma conta.",
+    "auth/invalid-credential": "E-mail ou senha incorretos.",
+    "auth/invalid-email": "Digite um e-mail valido.",
+    "auth/missing-password": "Digite sua senha.",
+    "auth/operation-not-allowed": "Ative o provedor Email/Password no Firebase Authentication.",
+    "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
+  };
+
+  return messages[error?.code] || "Nao foi possivel autenticar. Confira e-mail, senha e configuracao do Firebase.";
+}
+
+function getDatabaseErrorMessage(error) {
+  if (error?.code === "PERMISSION_DENIED") {
+    return "Login feito, mas o Realtime Database bloqueou o perfil. Ajuste as regras do banco para users/{uid}.";
+  }
+
+  return "Login feito, mas nao foi possivel salvar/ler o perfil no banco.";
+}
+
 function setAuthMode(nextMode) {
   authMode = nextMode;
   const isRegister = authMode === "register";
@@ -189,20 +210,31 @@ authForm.addEventListener("submit", async (event) => {
       if (name) {
         await updateProfile(credential.user, { displayName: name });
       }
-      await ensureUserProfile(credential.user, { name });
-      setAuthStatus("Conta criada. Perfil salvo com adm: false.", "success");
+      authForm.reset();
+
+      try {
+        const profile = await ensureUserProfile(credential.user, { name });
+        applyAuthUI(credential.user, profile);
+        setAuthStatus("Conta criada. Perfil salvo com adm: false.", "success");
+      } catch (databaseError) {
+        applyAuthUI(credential.user, { name, email, adm: false });
+        setAuthStatus(getDatabaseErrorMessage(databaseError), "error");
+      }
     } else {
       const credential = await signInWithEmailAndPassword(auth, email, password);
-      await ensureUserProfile(credential.user);
-      setAuthStatus("Login realizado.", "success");
-    }
+      authForm.reset();
 
-    authForm.reset();
+      try {
+        const profile = await ensureUserProfile(credential.user);
+        applyAuthUI(credential.user, profile);
+        setAuthStatus("Login realizado.", "success");
+      } catch (databaseError) {
+        applyAuthUI(credential.user, { adm: false });
+        setAuthStatus(getDatabaseErrorMessage(databaseError), "error");
+      }
+    }
   } catch (error) {
-    const readableMessage = error?.code
-      ? error.code.replace("auth/", "").replaceAll("-", " ")
-      : "Nao foi possivel autenticar.";
-    setAuthStatus(`Erro: ${readableMessage}`, "error");
+    setAuthStatus(getAuthErrorMessage(error), "error");
   } finally {
     authSubmit.disabled = false;
   }
