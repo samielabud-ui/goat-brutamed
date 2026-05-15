@@ -21,13 +21,13 @@ No Firebase Console, ative:
 - Authentication > Sign-in method > Email/Password.
 - Authentication > Settings > Authorized domains: inclua o dominio do Netlify quando publicar.
 
-Ao criar ou entrar com uma conta, o app cria/atualiza:
+Ao entrar com uma conta, o app busca o perfil manualmente criado em:
 
 ```txt
 users/{uid}
 ```
 
-Campos principais:
+O ID do documento precisa ser exatamente o UID do Firebase Auth. Campos principais:
 
 ```json
 {

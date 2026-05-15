@@ -11,8 +11,6 @@ import {
   doc,
   getDoc,
   getFirestore,
-  serverTimestamp,
-  setDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -120,8 +118,11 @@ function getAuthErrorMessage(error) {
 }
 
 function getProfileErrorMessage(error) {
-  const details = error?.code ? ` (${error.code})` : "";
-  return `Login realizado, mas houve erro ao acessar o perfil. Verifique as regras do Firestore.${details}`;
+  if (error?.message) {
+    return error.message;
+  }
+
+  return "Login realizado, mas houve erro ao acessar o perfil. Verifique as regras do Firestore.";
 }
 
 function logFirestoreError(operation, uid, error) {
@@ -145,16 +146,6 @@ async function getUserProfileDoc(userRef, uid, operation = "getDoc") {
   }
 }
 
-async function setUserProfileDoc(userRef, uid, profile) {
-  try {
-    console.log("[PROFILE] Criando/atualizando caminho:", `users/${uid}`);
-    await setDoc(userRef, profile, { merge: true });
-  } catch (error) {
-    logFirestoreError("setDoc", uid, error);
-    throw error;
-  }
-}
-
 function setAuthMode(nextMode) {
   if (isSubmittingAuth) {
     return;
@@ -172,55 +163,39 @@ function setAuthMode(nextMode) {
   setAuthStatus("");
 }
 
-async function createUserProfile(userRef, user, fallbackName = "") {
-  await setUserProfileDoc(userRef, user.uid, {
-    uid: user.uid,
-    nome: user.displayName || fallbackName || user.email?.split("@")[0] || "Usuario",
-    email: user.email || "",
-    role: "membro",
-    adm: false,
-    diretor: false,
-    ativo: true,
-    criadoEm: serverTimestamp(),
-    atualizadoEm: serverTimestamp(),
-  });
-}
-
-async function ensureUserProfile(user, fallbackName = "") {
+async function loadUserProfile(user) {
   const currentUid = auth.currentUser?.uid;
 
   if (!currentUid || currentUid !== user.uid) {
     throw new Error("Usuario autenticado indisponivel ou divergente.");
   }
 
-  console.log("[LOGIN] uid recebido:", user.uid);
+  console.log("[PROFILE] UID Auth:", user.uid);
   const userRef = doc(db, "users", user.uid);
-  const snap = await getUserProfileDoc(userRef, user.uid, "getDoc:ensureUserProfile");
+  console.log("[PROFILE] Buscando:", `users/${user.uid}`);
 
+  const snap = await getUserProfileDoc(userRef, user.uid, "getDoc:loadUserProfile");
   if (!snap.exists()) {
-    console.log("[PROFILE] Perfil inexistente, criando");
-    await createUserProfile(userRef, user, fallbackName);
-    console.log("[PROFILE] Perfil criado");
-  }
-
-  const updatedSnap = await getUserProfileDoc(userRef, user.uid, "getDoc:afterSetDoc");
-  if (!updatedSnap.exists()) {
-    const error = new Error(`Perfil users/${user.uid} nao foi encontrado apos criacao/leitura.`);
-    logFirestoreError("getDoc:not-found-after-setDoc", user.uid, error);
+    console.log("[PROFILE] Resultado: nao encontrado");
+    const error = new Error(
+      `Usuario autenticado, mas perfil nao encontrado em users/${user.uid}. Crie esse documento no Firestore usando o UID como ID.`
+    );
+    logFirestoreError("getDoc:not-found", user.uid, error);
     throw error;
   }
 
   const profile = {
-    id: updatedSnap.id,
-    ...updatedSnap.data(),
+    id: snap.id,
+    ...snap.data(),
   };
+  console.log("[PROFILE] Resultado: encontrado");
   console.log("[PROFILE] Perfil carregado:", profile);
   return profile;
 }
 
-async function loadAuthenticatedInterface(user, fallbackName = "") {
+async function loadAuthenticatedInterface(user) {
   try {
-    const profile = await ensureUserProfile(user, fallbackName);
+    const profile = await loadUserProfile(user);
     applyAuthUI(user, profile);
     return profile;
   } catch (error) {
@@ -306,11 +281,11 @@ authForm.addEventListener("submit", async (event) => {
       }
       authForm.reset();
       const profile = await withTimeout(
-        loadAuthenticatedInterface(credential.user, name),
+        loadAuthenticatedInterface(credential.user),
         "Tempo esgotado ao carregar perfil. Verifique sua conexao e as regras do Firestore."
       );
       if (profile) {
-        setAuthStatus("Conta criada. Perfil salvo com adm: false.", "success");
+        setAuthStatus("Conta criada e perfil carregado.", "success");
       }
     } else {
       const credential = await withTimeout(
