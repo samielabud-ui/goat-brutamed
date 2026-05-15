@@ -20,7 +20,8 @@ const firebaseConfig = {
   projectId: "brutafrequencia",
   storageBucket: "brutafrequencia.firebasestorage.app",
   messagingSenderId: "324840070453",
-  appId: "1:324840070453:web:a8f6309a5dfa2e959e007c",
+  appId: "1:324840070453:web:861cd59d025ad35f9e007c",
+  measurementId: "G-35WXP8FRCP",
 };
 
 const app = initializeApp(firebaseConfig);
